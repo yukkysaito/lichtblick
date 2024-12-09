@@ -5,9 +5,8 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { Chart, ArcElement, Tooltip, Legend } from "chart.js";
 import * as _ from "lodash-es";
-import { useCallback, useRef, useEffect, useLayoutEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import Logger from "@lichtblick/log";
@@ -20,8 +19,6 @@ import { settingsActionReducer, useSettingsTree } from "./settings";
 import type { Config } from "./types";
 
 const log = Logger.getLogger(__filename);
-
-Chart.register(ArcElement, Tooltip, Legend);
 
 type Props = {
   context: PanelExtensionContext;
@@ -159,9 +156,6 @@ export function PieChart({ context }: Props): React.JSX.Element {
     }),
   );
 
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstanceRef = useRef<Chart | null>(null);
-
   useLayoutEffect(() => {
     dispatch({ type: "path", path: config.path });
   }, [config.path]);
@@ -230,47 +224,54 @@ export function PieChart({ context }: Props): React.JSX.Element {
   log.info("reducer11: New data received", rawValue);
   // データが空でないかチェック
   if (rawValue.length > 0) {
+    const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
+    const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
 
+    log.info("reducer12: New data received", percentages.length);
 
+    // 色マッピングの準備（白と黒のみ）
+    const colorStops = percentages.map((percentage, index) => {
+      let color: string;
 
-    // // 各セグメントの割合を計算
-    // const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
+      // 配列サイズが1の場合は、単一の色（例えば白）を使用
+      if (percentages.length === 1) {
+        color = "rgb(255, 255, 255)"; // 白
+      } else {
+        // インデックスに基づいて白から黒へのグラデーションを作成
+        color = `rgb(${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255})`;
+        // log.info("reducer13: New data received", color);
+        // log.info("reducer14: New data received", index);
+      }
+      log.info("reducer15: color", color);
+      log.info("reducer16: percentage", percentage);
 
-    // const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
-    // log.info("reducer12: New data received", percentages.length - 1);
+      return `${color} ${percentage}%`;
+    });
 
-    // // 色マッピングの準備
-    // const colorStops = percentages.map((percentage, index) => {
-    //   const color = turboColorString(
-    //     percentages.length > 1 ? index / (percentages.length - 1) : 0
-    //   );
-    //   return `${color} ${percentage}%`;
-    // });
+    // 円グラフの色付け
+    const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
 
-    // // 円グラフの色付け
-    // const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
-
-    // return (
-    //   <div
-    //     style={{
-    //       display: "flex",
-    //       justifyContent: "center",
-    //       alignItems: "center",
-    //       width: "100%",
-    //       height: "100%",
-    //       position: "relative",
-    //     }}
-    //   >
-    //     <div
-    //       style={{
-    //         width: "200px",
-    //         height: "200px",
-    //         borderRadius: "50%",
-    //         background: conicGradient,
-    //       }}
-    //     />
-    //   </div>
-    // );
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100%",
+          height: "100%",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: "200px",
+            height: "200px",
+            borderRadius: "50%",
+            background: conicGradient,
+          }}
+        />
+      </div>
+    );
   } else {
     // データがない場合のフォールバック
     return <div>No data available</div>;
