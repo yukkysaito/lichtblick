@@ -9,6 +9,7 @@ import * as _ from "lodash-es";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
+import Logger from "@lichtblick/log";
 import { parseMessagePath, MessagePath } from "@lichtblick/message-path";
 import { MessageEvent, PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
 import { simpleGetMessagePathDataItems } from "@lichtblick/suite-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
@@ -16,6 +17,8 @@ import { turboColorString } from "@lichtblick/suite-base/util/colorUtils";
 
 import { settingsActionReducer, useSettingsTree } from "./settings";
 import type { Config } from "./types";
+
+const log = Logger.getLogger(__filename);
 
 type Props = {
   context: PanelExtensionContext;
@@ -45,14 +48,17 @@ type Action =
   | { type: "path"; path: string }
   | { type: "seek" };
 
-function getSingleDataItem(results: unknown[]) {
-  if (results.length <= 1) {
-    return results[0];
-  }
-  throw new Error("Message path produced multiple results");
-}
+// function getSingleDataItem(results: unknown[]) {
+//   if (results.length <= 1) {
+//     return results[0];
+//   }
+//   throw new Error("Message path produced multiple results");
+// }
 
 function reducer(state: State, action: Action): State {
+  // log.info("reducer: New data received", state.latestMatchingQueriedData);
+  log.info("reducer2: New data received", state);
+  log.info("reducer3: New data received", action);
   try {
     switch (action.type) {
       case "frame": {
@@ -62,13 +68,20 @@ function reducer(state: State, action: Action): State {
         let latestMatchingQueriedData = state.latestMatchingQueriedData;
         let latestMessage = state.latestMessage;
         if (state.parsedPath) {
+
           for (const message of action.messages) {
             if (message.topic !== state.parsedPath.topicName) {
               continue;
             }
-            const data = getSingleDataItem(
-              simpleGetMessagePathDataItems(message, state.parsedPath),
-            );
+            log.info("reducer6: New data received", message.receiveTime);
+
+
+            // const data = getSingleDataItem(
+            //   simpleGetMessagePathDataItems(message, state.parsedPath),
+            // );
+            const data = (message.message as { data: Float32Array }).data;
+            log.info("reducer7: New data received", data);
+
             if (data != undefined) {
               latestMatchingQueriedData = data;
               latestMessage = message;
@@ -93,11 +106,15 @@ function reducer(state: State, action: Action): State {
         let latestMatchingQueriedData: unknown;
         let error: Error | undefined;
         try {
-          latestMatchingQueriedData =
-            newPath && pathParseError == undefined && state.latestMessage
-              ? getSingleDataItem(simpleGetMessagePathDataItems(state.latestMessage, newPath))
-              : undefined;
-        } catch (err: unknown) {
+          // latestMatchingQueriedData =
+          //   newPath && pathParseError == undefined && state.latestMessage
+          //     ? getSingleDataItem(simpleGetMessagePathDataItems(state.latestMessage, newPath))
+          //     : undefined;
+            latestMatchingQueriedData =
+              newPath && pathParseError == undefined && state.latestMessage
+                ? simpleGetMessagePathDataItems(state.latestMessage, newPath)
+                : undefined;
+          } catch (err: unknown) {
           error = err as Error;
         }
         return {
@@ -254,17 +271,19 @@ export function PieChart({ context }: Props): React.JSX.Element {
   useEffect(() => {
     renderDone();
   }, [renderDone]);
+  log.info("reducer10: New data received", state.latestMatchingQueriedData);
 
   const rawValue =
-    typeof state.latestMatchingQueriedData === "number" ||
-    typeof state.latestMatchingQueriedData === "string"
-      ? Number(state.latestMatchingQueriedData)
-      : NaN;
+    state.latestMatchingQueriedData instanceof Float32Array
+      ? state.latestMatchingQueriedData
+      : [];
 
-  const { minValue, maxValue } = config;
-  const scaledValue =
-    (Math.max(minValue, Math.min(rawValue, maxValue)) - minValue) / (maxValue - minValue);
-  const outOfBounds = rawValue < minValue || rawValue > maxValue;
+
+  log.info("reducer11: New data received", rawValue);
+
+
+
+
 
   const padding = 0.1;
   const centerX = 0.5 + padding;
@@ -278,89 +297,97 @@ export function PieChart({ context }: Props): React.JSX.Element {
       centerY - radius * Math.sin(pieChartAngle),
       centerY - innerRadius * Math.sin(pieChartAngle),
     ) + padding;
-  const needleThickness = 8;
-  const needleExtraLength = 0.05;
   const [clipPathId] = useState(() => `pieChart-clip-path-${uuidv4()}`);
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-around",
-        alignItems: "center",
-        overflow: "hidden",
-        padding: 8,
-      }}
-    >
-      <div style={{ width: "100%", overflow: "hidden" }}>
-        <div
-          style={{
-            position: "relative",
-            maxWidth: "100%",
-            maxHeight: "100%",
-            aspectRatio: `${width} / ${height}`,
-            margin: "0 auto",
-            transform: "scale(1)", // Work around a Safari bug: https://bugs.webkit.org/show_bug.cgi?id=231849
-          }}
-        >
+
+  // rawValueが空でない場合のみ計算
+  if (rawValue.length > 0) {
+    // 全ての値の合計を計算
+    const total = (rawValue as number[]).reduce((sum: number, value: number) => sum + value, 0);
+
+    const percentages = Array.from(rawValue).map((value: number) => (value / total) * 100);
+
+    const colorStops = percentages.map((percentage: number, index: number) => {
+      const color = turboColorString(index / (percentages.length - 1));
+      return { color, percentage };
+    });
+
+    // 円グラフの色を適用するために、conic-gradientを変更
+    const getConicGradientWithData = () => {
+      let angleStart = -Math.PI / 2;
+      return `conic-gradient(${colorStops
+        .map(({ color, percentage }) => {
+          const angleEnd = angleStart + (percentage / 100) * (2 * Math.PI);
+          const segment = `${color} ${angleStart}rad ${angleEnd}rad`;
+          angleStart = angleEnd;
+          return segment;
+        })
+        .join(",")}`;
+    };
+
+    // グラフに適用するための関数を呼び出し
+    const conicGradient = getConicGradientWithData();
+
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          overflow: "hidden",
+          padding: 8,
+        }}
+      >
+        <div style={{ width: "100%", overflow: "hidden" }}>
           <div
             style={{
-              width: "100%",
-              height: "100%",
-              background: getConicGradient(config, width, height, pieChartAngle),
-              clipPath: `url(#${clipPathId})`,
-              opacity: state.latestMatchingQueriedData == undefined ? 0.5 : 1,
-            }}
-          />
-          <div
-            style={{
-              backgroundColor: outOfBounds ? "orange" : "white",
-              width: needleThickness,
-              height: `${(100 * (radius + needleExtraLength)) / height}%`,
-              border: "2px solid black",
-              borderRadius: needleThickness / 2,
-              position: "absolute",
-              bottom: `${100 * (1 - centerY / height)}%`,
-              left: "50%",
-              transformOrigin: "bottom left",
+              position: "relative",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              aspectRatio: `${width} / ${height}`,
               margin: "0 auto",
-              transform: [
-                `scaleZ(1)`,
-                `rotate(${
-                  -Math.PI / 2 + pieChartAngle + scaledValue * 2 * (Math.PI / 2 - pieChartAngle)
-                }rad)`,
-                `translateX(${-needleThickness / 2}px)`,
-                `translateY(${needleThickness / 2}px)`,
-              ].join(" "),
-              display: Number.isFinite(scaledValue) ? "block" : "none",
+              transform: "scale(1)", // Work around a Safari bug: https://bugs.webkit.org/show_bug.cgi?id=231849
             }}
-          />
-        </div>
-        <svg style={{ position: "absolute" }}>
-          <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-            <path
-              transform={`scale(${1 / width}, ${1 / height})`}
-              d={[
-                `M ${centerX - radius * Math.cos(pieChartAngle)},${
-                  centerY - radius * Math.sin(pieChartAngle)
-                }`,
-                `A 0.5,0.5 0 ${pieChartAngle < 0 ? 1 : 0} 1 ${
-                  centerX + radius * Math.cos(pieChartAngle)
-                },${centerY - radius * Math.sin(pieChartAngle)}`,
-                `L ${centerX + innerRadius * Math.cos(pieChartAngle)},${
-                  centerY - innerRadius * Math.sin(pieChartAngle)
-                }`,
-                `A ${innerRadius},${innerRadius} 0 ${pieChartAngle < 0 ? 1 : 0} 0 ${
-                  centerX - innerRadius * Math.cos(pieChartAngle)
-                },${centerY - innerRadius * Math.sin(pieChartAngle)}`,
-                `Z`,
-              ].join(" ")}
+          >
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                background: conicGradient,
+                clipPath: `url(#${clipPathId})`,
+                opacity: state.latestMatchingQueriedData == undefined ? 0.5 : 1,
+              }}
             />
-          </clipPath>
-        </svg>
+          </div>
+          <svg style={{ position: "absolute" }}>
+            <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+              <path
+                transform={`scale(${1 / width}, ${1 / height})`}
+                d={[
+                  `M ${centerX - radius * Math.cos(pieChartAngle)},${
+                    centerY - radius * Math.sin(pieChartAngle)
+                  }`,
+                  `A 0.5,0.5 0 ${pieChartAngle < 0 ? 1 : 0} 1 ${
+                    centerX + radius * Math.cos(pieChartAngle)
+                  },${centerY - radius * Math.sin(pieChartAngle)}`,
+                  `L ${centerX + innerRadius * Math.cos(pieChartAngle)},${
+                    centerY - innerRadius * Math.sin(pieChartAngle)
+                  }`,
+                  `A ${innerRadius},${innerRadius} 0 ${pieChartAngle < 0 ? 1 : 0} 0 ${
+                    centerX - innerRadius * Math.cos(pieChartAngle)
+                  },${centerY - innerRadius * Math.sin(pieChartAngle)}`,
+                  `Z`,
+                ].join(" ")}
+              />
+            </clipPath>
+          </svg>
+        </div>
       </div>
-    </div>
-  );
+    );
+  } else {
+    return <div>No data available</div>;
+  }
+
 }
