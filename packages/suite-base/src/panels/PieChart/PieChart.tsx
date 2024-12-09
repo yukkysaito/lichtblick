@@ -5,8 +5,9 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+import { Chart, ArcElement, Tooltip, Legend } from "chart.js";
 import * as _ from "lodash-es";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
+import { useCallback, useRef, useEffect, useLayoutEffect, useReducer, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import Logger from "@lichtblick/log";
@@ -19,6 +20,8 @@ import { settingsActionReducer, useSettingsTree } from "./settings";
 import type { Config } from "./types";
 
 const log = Logger.getLogger(__filename);
+
+Chart.register(ArcElement, Tooltip, Legend);
 
 type Props = {
   context: PanelExtensionContext;
@@ -47,13 +50,6 @@ type Action =
   | { type: "frame"; messages: readonly MessageEvent[] }
   | { type: "path"; path: string }
   | { type: "seek" };
-
-// function getSingleDataItem(results: unknown[]) {
-//   if (results.length <= 1) {
-//     return results[0];
-//   }
-//   throw new Error("Message path produced multiple results");
-// }
 
 function reducer(state: State, action: Action): State {
   // log.info("reducer: New data received", state.latestMatchingQueriedData);
@@ -139,57 +135,6 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-function getConicGradient(config: Config, width: number, height: number, pieChartAngle: number) {
-  let colorStops: { color: string; location: number }[];
-  switch (config.colorMode) {
-    case "colormap":
-      switch (config.colorMap) {
-        case "red-yellow-green":
-          colorStops = [
-            { color: "#f00", location: 0 },
-            { color: "#ff0", location: 0.5 },
-            { color: "#0c0", location: 1 },
-          ];
-          break;
-        case "rainbow":
-          colorStops = [
-            { color: "#f0f", location: 0 },
-            { color: "#00f", location: 1 / 5 },
-            { color: "#0ff", location: 2 / 5 },
-            { color: "#0f0", location: 3 / 5 },
-            { color: "#ff0", location: 4 / 5 },
-            { color: "#f00", location: 5 / 5 },
-          ];
-          break;
-        case "turbo": {
-          const numStops = 20;
-          colorStops = new Array(numStops).fill(undefined).map((_x, i) => ({
-            color: turboColorString(i / (numStops - 1)),
-            location: i / (numStops - 1),
-          }));
-          break;
-        }
-      }
-      break;
-    case "gradient":
-      colorStops = [
-        { color: config.gradient[0], location: 0 },
-        { color: config.gradient[1], location: 1 },
-      ];
-      break;
-  }
-  if (config.reverse) {
-    colorStops = colorStops
-      .map((stop) => ({ color: stop.color, location: 1 - stop.location }))
-      .reverse();
-  }
-
-  return `conic-gradient(from ${-Math.PI / 2 + pieChartAngle}rad at 50% ${
-    100 * (width / 2 / height)
-  }%, ${colorStops
-    .map((stop) => `${stop.color} ${stop.location * 2 * (Math.PI / 2 - pieChartAngle)}rad`)
-    .join(",")}, ${colorStops[0]!.color})`;
-}
 
 export function PieChart({ context }: Props): React.JSX.Element {
   // panel extensions must notify when they've completed rendering
@@ -213,6 +158,9 @@ export function PieChart({ context }: Props): React.JSX.Element {
       error: undefined,
     }),
   );
+
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInstanceRef = useRef<Chart | null>(null);
 
   useLayoutEffect(() => {
     dispatch({ type: "path", path: config.path });
@@ -280,114 +228,51 @@ export function PieChart({ context }: Props): React.JSX.Element {
 
 
   log.info("reducer11: New data received", rawValue);
-
-
-
-
-
-  const padding = 0.1;
-  const centerX = 0.5 + padding;
-  const centerY = 0.5 + padding;
-  const pieChartAngle = -Math.PI / 8;
-  const radius = 0.5;
-  const innerRadius = 0.4;
-  const width = 1 + 2 * padding;
-  const height =
-    Math.max(
-      centerY - radius * Math.sin(pieChartAngle),
-      centerY - innerRadius * Math.sin(pieChartAngle),
-    ) + padding;
-  const [clipPathId] = useState(() => `pieChart-clip-path-${uuidv4()}`);
-
-  // rawValueが空でない場合のみ計算
+  // データが空でないかチェック
   if (rawValue.length > 0) {
-    // 全ての値の合計を計算
-    const total = (rawValue as number[]).reduce((sum: number, value: number) => sum + value, 0);
 
-    const percentages = Array.from(rawValue).map((value: number) => (value / total) * 100);
 
-    const colorStops = percentages.map((percentage: number, index: number) => {
-      const color = turboColorString(index / (percentages.length - 1));
-      return { color, percentage };
-    });
 
-    // 円グラフの色を適用するために、conic-gradientを変更
-    const getConicGradientWithData = () => {
-      let angleStart = -Math.PI / 2;
-      return `conic-gradient(${colorStops
-        .map(({ color, percentage }) => {
-          const angleEnd = angleStart + (percentage / 100) * (2 * Math.PI);
-          const segment = `${color} ${angleStart}rad ${angleEnd}rad`;
-          angleStart = angleEnd;
-          return segment;
-        })
-        .join(",")}`;
-    };
+    // // 各セグメントの割合を計算
+    // const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
 
-    // グラフに適用するための関数を呼び出し
-    const conicGradient = getConicGradientWithData();
+    // const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
+    // log.info("reducer12: New data received", percentages.length - 1);
 
-    return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          overflow: "hidden",
-          padding: 8,
-        }}
-      >
-        <div style={{ width: "100%", overflow: "hidden" }}>
-          <div
-            style={{
-              position: "relative",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              aspectRatio: `${width} / ${height}`,
-              margin: "0 auto",
-              transform: "scale(1)", // Work around a Safari bug: https://bugs.webkit.org/show_bug.cgi?id=231849
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: conicGradient,
-                clipPath: `url(#${clipPathId})`,
-                opacity: state.latestMatchingQueriedData == undefined ? 0.5 : 1,
-              }}
-            />
-          </div>
-          <svg style={{ position: "absolute" }}>
-            <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-              <path
-                transform={`scale(${1 / width}, ${1 / height})`}
-                d={[
-                  `M ${centerX - radius * Math.cos(pieChartAngle)},${
-                    centerY - radius * Math.sin(pieChartAngle)
-                  }`,
-                  `A 0.5,0.5 0 ${pieChartAngle < 0 ? 1 : 0} 1 ${
-                    centerX + radius * Math.cos(pieChartAngle)
-                  },${centerY - radius * Math.sin(pieChartAngle)}`,
-                  `L ${centerX + innerRadius * Math.cos(pieChartAngle)},${
-                    centerY - innerRadius * Math.sin(pieChartAngle)
-                  }`,
-                  `A ${innerRadius},${innerRadius} 0 ${pieChartAngle < 0 ? 1 : 0} 0 ${
-                    centerX - innerRadius * Math.cos(pieChartAngle)
-                  },${centerY - innerRadius * Math.sin(pieChartAngle)}`,
-                  `Z`,
-                ].join(" ")}
-              />
-            </clipPath>
-          </svg>
-        </div>
-      </div>
-    );
+    // // 色マッピングの準備
+    // const colorStops = percentages.map((percentage, index) => {
+    //   const color = turboColorString(
+    //     percentages.length > 1 ? index / (percentages.length - 1) : 0
+    //   );
+    //   return `${color} ${percentage}%`;
+    // });
+
+    // // 円グラフの色付け
+    // const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
+
+    // return (
+    //   <div
+    //     style={{
+    //       display: "flex",
+    //       justifyContent: "center",
+    //       alignItems: "center",
+    //       width: "100%",
+    //       height: "100%",
+    //       position: "relative",
+    //     }}
+    //   >
+    //     <div
+    //       style={{
+    //         width: "200px",
+    //         height: "200px",
+    //         borderRadius: "50%",
+    //         background: conicGradient,
+    //       }}
+    //     />
+    //   </div>
+    // );
   } else {
+    // データがない場合のフォールバック
     return <div>No data available</div>;
   }
-
 }
