@@ -5,16 +5,14 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import Chart from "chart.js/auto";
 import * as _ from "lodash-es";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
+import { PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 import Logger from "@lichtblick/log";
 import { parseMessagePath, MessagePath } from "@lichtblick/message-path";
 import { MessageEvent, PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
 import { simpleGetMessagePathDataItems } from "@lichtblick/suite-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
-// import { turboColorString } from "@lichtblick/suite-base/util/colorUtils";
 
 import { settingsActionReducer, useSettingsTree } from "./settings";
 import type { Config } from "./types";
@@ -50,9 +48,8 @@ type Action =
   | { type: "seek" };
 
 function reducer(state: State, action: Action): State {
-  // log.info("reducer: New data received", state.latestMatchingQueriedData);
-  log.info("reducer2: New data received", state);
-  log.info("reducer3: New data received", action);
+  // log.info("New data received: state", state);
+  // log.info("New data received: action", action);
   try {
     switch (action.type) {
       case "frame": {
@@ -67,14 +64,8 @@ function reducer(state: State, action: Action): State {
             if (message.topic !== state.parsedPath.topicName) {
               continue;
             }
-            log.info("reducer6: New data received", message.receiveTime);
 
-
-            // const data = getSingleDataItem(
-            //   simpleGetMessagePathDataItems(message, state.parsedPath),
-            // );
             const data = (message.message as { data: Float32Array }).data;
-            log.info("reducer7: New data received", data);
 
             if (data != undefined) {
               latestMatchingQueriedData = data;
@@ -100,10 +91,6 @@ function reducer(state: State, action: Action): State {
         let latestMatchingQueriedData: unknown;
         let error: Error | undefined;
         try {
-          // latestMatchingQueriedData =
-          //   newPath && pathParseError == undefined && state.latestMessage
-          //     ? getSingleDataItem(simpleGetMessagePathDataItems(state.latestMessage, newPath))
-          //     : undefined;
             latestMatchingQueriedData =
               newPath && pathParseError == undefined && state.latestMessage
                 ? simpleGetMessagePathDataItems(state.latestMessage, newPath)
@@ -156,8 +143,6 @@ export function PieChart({ context }: Props): React.JSX.Element {
       error: undefined,
     }),
   );
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef(null);
 
   useLayoutEffect(() => {
     dispatch({ type: "path", path: config.path });
@@ -216,116 +201,74 @@ export function PieChart({ context }: Props): React.JSX.Element {
   useEffect(() => {
     renderDone();
   }, [renderDone]);
-  log.info("reducer10: New data received", state.latestMatchingQueriedData);
 
   const rawValue =
     state.latestMatchingQueriedData instanceof Float32Array
       ? state.latestMatchingQueriedData
-      : [];
+      : new Float32Array();
 
+  const chartData = rawValue.length > 0 ? Array.from(rawValue).map((value) => (value / Array.from(rawValue).reduce((sum, val) => sum + val, 0)) * 100) : [];
 
-  log.info("reducer11: New data received", rawValue);
-  // ------------------------------------------------------------
+  const data = chartData.map((value, index) => ({
+    name: `Data ${index + 1}`,
+    value,
+    color: `hsl(${(index / chartData.length) * 360}, 70%, 50%)`,
+  }));
 
-  useEffect(() => {
-    if (!canvasRef.current || rawValue.length === 0) {return;}
+  // const [key, setKey] = useState(0);
 
-    // 既存のチャートを破棄
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
-
-    const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
-    const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
-
-    log.info("reducer12: New data received", percentages.length);
-
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "pie",
-      data: {
-        labels: Array.from(rawValue).map((_, index) => `Data ${index + 1}`),
-        datasets: [
-          {
-            data: percentages,
-            backgroundColor: percentages.map((_, index) =>
-              `rgb(${(index / (percentages.length)) * 255},
-                   ${(index / (percentages.length)) * 255},
-                   ${(index / (percentages.length)) * 255})`,
-            ),
-          },
-        ],
-      },
-    });
-  }, [rawValue]);
-
-  if (rawValue.length === 0) {
-    return <div>No data available</div>;
-  }
+  // useEffect(() => {
+  //   setKey((prevKey) => prevKey + 1);
+  // }, [rawValue]);
 
   return (
     <div>
       <h1>Pie Chart</h1>
-      <canvas ref={canvasRef}></canvas>
+      {rawValue.length === 0 ? (
+        <div>No data available</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={400}>
+          <RechartsPieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              label
+              fill="#8884d8"
+              cx="50%"
+              cy="50%"
+              innerRadius="40%"
+              outerRadius="80%"
+              animationBegin={0}
+              animationDuration={1000}
+              animationEasing="ease-out"
+            >
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.color}
+                  // stroke="none"
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '5px',
+                color: 'white',
+                fontSize: '14px',
+                padding: '10px',
+              }}
+              formatter={(value, name) => {
+                const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
+                return [`${name}: ${formattedValue}%`];
+              }}
+              />
+            <Legend />
+          </RechartsPieChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
-
-
-// ------------------------------------------------------------
-
-  // // データが空でないかチェック
-  // if (rawValue.length > 0) {
-  //   const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
-  //   const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
-
-    // log.info("reducer12: New data received", percentages.length);
-
-    // // 色マッピングの準備（白と黒のみ）
-    // const colorStops = percentages.map((percentage, index) => {
-    //   let color: string;
-
-    //   // 配列サイズが1の場合は、単一の色（例えば白）を使用
-    //   if (percentages.length === 1) {
-    //     color = "rgb(255, 255, 255)"; // 白
-    //   } else {
-    //     // インデックスに基づいて白から黒へのグラデーションを作成
-    //     color = `rgb(${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255})`;
-    //     // log.info("reducer13: New data received", color);
-    //     // log.info("reducer14: New data received", index);
-    //   }
-    //   log.info("reducer15: color", color);
-    //   log.info("reducer16: percentage", percentage);
-
-    //   return `${color} ${percentage}%`;
-    // });
-
-    // // 円グラフの色付け
-    // const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
-
-    // return (
-    //   <div
-    //     style={{
-    //       display: "flex",
-    //       justifyContent: "center",
-    //       alignItems: "center",
-    //       width: "100%",
-    //       height: "100%",
-    //       position: "relative",
-    //     }}
-    //   >
-    //     <div
-    //       style={{
-    //         width: "200px",
-    //         height: "200px",
-    //         borderRadius: "50%",
-    //         background: conicGradient,
-    //       }}
-    //     />
-    //   </div>
-    // );
-
-//   } else {
-//     // データがない場合のフォールバック
-//     return <div>No data available</div>;
-//   }
-// }
+export default PieChart;
