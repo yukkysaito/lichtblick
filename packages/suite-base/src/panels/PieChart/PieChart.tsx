@@ -215,12 +215,6 @@ export function PieChart({ context }: Props): React.JSX.Element {
     color: `hsl(${(index / chartData.length) * 360}, 70%, 50%)`,
   }));
 
-  // const [key, setKey] = useState(0);
-
-  // useEffect(() => {
-  //   setKey((prevKey) => prevKey + 1);
-  // }, [rawValue]);
-
   return (
     <div>
       <h1>Pie Chart</h1>
@@ -233,7 +227,10 @@ export function PieChart({ context }: Props): React.JSX.Element {
               data={data}
               dataKey="value"
               nameKey="name"
-              label
+              label={({ index }) => {
+                const value = rawValue[index];
+                return value ? value.toFixed(2) : '';
+              }}
               fill="#8884d8"
               cx="50%"
               cy="50%"
@@ -247,13 +244,12 @@ export function PieChart({ context }: Props): React.JSX.Element {
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}
-                  // stroke="none"
                 />
               ))}
             </Pie>
             <Tooltip
               contentStyle={{
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                backgroundColor: 'rgba(255, 255, 255, 0.8)',
                 borderRadius: '5px',
                 color: 'white',
                 fontSize: '14px',
@@ -271,4 +267,3 @@ export function PieChart({ context }: Props): React.JSX.Element {
     </div>
   );
 }
-export default PieChart;
