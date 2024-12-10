@@ -60,48 +60,60 @@ export function useSettingsTree(
           error: pathParseError,
           validTypes: supportedDataTypes,
         },
-        minValue: {
-          label: "Min",
-          input: "number",
-          value: config.minValue,
+        title: {
+          label: "Title",
+          input: "string",
+          value: config.title,
         },
-        maxValue: {
-          label: "Max",
-          input: "number",
-          value: config.maxValue,
+        legend1: {
+          label: "Legend 1",
+          input: "string",
+          value: config.legend1,
         },
-        colorMode: {
-          label: "Color mode",
-          input: "select",
-          value: config.colorMode,
-          options: [
-            { label: "Color map", value: "colormap" },
-            { label: "Gradient", value: "gradient" },
-          ],
+        legend2: {
+          label: "Legend 2",
+          input: "string",
+          value: config.legend2,
         },
-        ...(config.colorMode === "colormap" && {
-          colorMap: {
-            label: "Color map",
-            input: "select",
-            value: config.colorMap,
-            options: [
-              { label: "Red to green", value: "red-yellow-green" },
-              { label: "Rainbow", value: "rainbow" },
-              { label: "Turbo", value: "turbo" },
-            ],
-          },
-        }),
-        ...(config.colorMode === "gradient" && {
-          gradient: {
-            label: "Gradient",
-            input: "gradient",
-            value: config.gradient,
-          },
-        }),
-        reverse: {
-          label: "Reverse",
-          input: "boolean",
-          value: config.reverse,
+        legend3: {
+          label: "Legend 3",
+          input: "string",
+          value: config.legend3,
+        },
+        legend4: {
+          label: "Legend 4",
+          input: "string",
+          value: config.legend4,
+        },
+        legend5: {
+          label: "Legend 5",
+          input: "string",
+          value: config.legend5,
+        },
+        legend6: {
+          label: "Legend 6",
+          input: "string",
+          value: config.legend6,
+        },
+        legend7: {
+          label: "Legend 7",
+          input: "string",
+          value: config.legend7,
+        },
+        legend8: {
+          label: "Legend 8",
+          input: "string",
+          value: config.legend8,
+        },
+        legend9: {
+          label: "Legend 9",
+          input: "string",
+          value: config.legend9,
+        },
+        legend10: {
+          label: "Legend 10",
+          input: "string",
+          value: config.legend10,
         },
       },
     }),

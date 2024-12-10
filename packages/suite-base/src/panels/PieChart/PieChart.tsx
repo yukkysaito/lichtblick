@@ -25,12 +25,17 @@ type Props = {
 
 const defaultConfig: Config = {
   path: "",
-  minValue: 0,
-  maxValue: 1,
-  colorMap: "red-yellow-green",
-  colorMode: "colormap",
-  gradient: ["#0000ff", "#ff00ff"],
-  reverse: false,
+  title: "Pie Chart",
+  legend1: "Legend 1",
+  legend2: "Legend 2",
+  legend3: "Legend 3",
+  legend4: "Legend 4",
+  legend5: "Legend 5",
+  legend6: "Legend 6",
+  legend7: "Legend 7",
+  legend8: "Legend 8",
+  legend9: "Legend 9",
+  legend10: "Legend 10",
 };
 
 type State = {
@@ -210,14 +215,15 @@ export function PieChart({ context }: Props): React.JSX.Element {
   const chartData = rawValue.length > 0 ? Array.from(rawValue).map((value) => (value / Array.from(rawValue).reduce((sum, val) => sum + val, 0)) * 100) : [];
 
   const data = chartData.map((value, index) => ({
-    name: `Data ${index + 1}`,
+    name: (config as any)[`legend${index + 1}`] || `Data ${index + 1}`,
     value,
-    color: `hsl(${(index / chartData.length) * 360}, 70%, 50%)`,
+    // color: `hsl(${(index / chartData.length) * 40 + 200}, 20%, ${85 - index * 5}%)`,
+    color: `hsl(${(index / chartData.length) * 40 + 200}, 20%, ${50 - index * 5}%)`,
   }));
 
   return (
-    <div>
-      <h1>Pie Chart</h1>
+    <div style={{ fontFamily: 'Arial, sans-serif', color: '#333' }}>
+      <h1 style={{ textAlign: 'center', fontSize: '24px', marginBottom: '20px' }}>{(config as any)[`title`]} </h1>
       {rawValue.length === 0 ? (
         <div>No data available</div>
       ) : (
@@ -236,9 +242,9 @@ export function PieChart({ context }: Props): React.JSX.Element {
               cy="50%"
               innerRadius="40%"
               outerRadius="80%"
-              animationBegin={0}
-              animationDuration={1000}
-              animationEasing="ease-out"
+              animationBegin={500}
+              animationDuration={1500}
+              animationEasing="ease-in-out"
             >
               {data.map((entry, index) => (
                 <Cell
@@ -250,10 +256,12 @@ export function PieChart({ context }: Props): React.JSX.Element {
             <Tooltip
               contentStyle={{
                 backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                borderRadius: '5px',
-                color: 'white',
+                borderRadius: '10px',
+                border: 'none',
+                color: '#fff',
                 fontSize: '14px',
                 padding: '10px',
+                boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.3)',
               }}
               formatter={(value, name) => {
                 const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;

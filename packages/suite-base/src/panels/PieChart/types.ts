@@ -7,10 +7,15 @@
 
 export type Config = {
   path: string;
-  minValue: number;
-  maxValue: number;
-  colorMode: "colormap" | "gradient";
-  colorMap: "red-yellow-green" | "rainbow" | "turbo";
-  gradient: [string, string];
-  reverse: boolean;
+  title: string;
+  legend1: string;
+  legend2: string;
+  legend3: string;
+  legend4: string;
+  legend5: string;
+  legend6: string;
+  legend7: string;
+  legend8: string;
+  legend9: string;
+  legend10: string;
 };
