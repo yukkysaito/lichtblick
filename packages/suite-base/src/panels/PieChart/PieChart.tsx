@@ -5,15 +5,16 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+import Chart from "chart.js/auto";
 import * as _ from "lodash-es";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import Logger from "@lichtblick/log";
 import { parseMessagePath, MessagePath } from "@lichtblick/message-path";
 import { MessageEvent, PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
 import { simpleGetMessagePathDataItems } from "@lichtblick/suite-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
-import { turboColorString } from "@lichtblick/suite-base/util/colorUtils";
+// import { turboColorString } from "@lichtblick/suite-base/util/colorUtils";
 
 import { settingsActionReducer, useSettingsTree } from "./settings";
 import type { Config } from "./types";
@@ -155,6 +156,8 @@ export function PieChart({ context }: Props): React.JSX.Element {
       error: undefined,
     }),
   );
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef(null);
 
   useLayoutEffect(() => {
     dispatch({ type: "path", path: config.path });
@@ -222,58 +225,107 @@ export function PieChart({ context }: Props): React.JSX.Element {
 
 
   log.info("reducer11: New data received", rawValue);
-  // データが空でないかチェック
-  if (rawValue.length > 0) {
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    if (!canvasRef.current || rawValue.length === 0) {return;}
+
+    // 既存のチャートを破棄
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
+
     const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
     const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
 
     log.info("reducer12: New data received", percentages.length);
 
-    // 色マッピングの準備（白と黒のみ）
-    const colorStops = percentages.map((percentage, index) => {
-      let color: string;
-
-      // 配列サイズが1の場合は、単一の色（例えば白）を使用
-      if (percentages.length === 1) {
-        color = "rgb(255, 255, 255)"; // 白
-      } else {
-        // インデックスに基づいて白から黒へのグラデーションを作成
-        color = `rgb(${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255})`;
-        // log.info("reducer13: New data received", color);
-        // log.info("reducer14: New data received", index);
-      }
-      log.info("reducer15: color", color);
-      log.info("reducer16: percentage", percentage);
-
-      return `${color} ${percentage}%`;
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "pie",
+      data: {
+        labels: Array.from(rawValue).map((_, index) => `Data ${index + 1}`),
+        datasets: [
+          {
+            data: percentages,
+            backgroundColor: percentages.map((_, index) =>
+              `rgb(${(index / (percentages.length)) * 255},
+                   ${(index / (percentages.length)) * 255},
+                   ${(index / (percentages.length)) * 255})`,
+            ),
+          },
+        ],
+      },
     });
+  }, [rawValue]);
 
-    // 円グラフの色付け
-    const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
-
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          width: "100%",
-          height: "100%",
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            width: "200px",
-            height: "200px",
-            borderRadius: "50%",
-            background: conicGradient,
-          }}
-        />
-      </div>
-    );
-  } else {
-    // データがない場合のフォールバック
+  if (rawValue.length === 0) {
     return <div>No data available</div>;
   }
+
+  return (
+    <div>
+      <h1>Pie Chart</h1>
+      <canvas ref={canvasRef}></canvas>
+    </div>
+  );
 }
+
+
+// ------------------------------------------------------------
+
+  // // データが空でないかチェック
+  // if (rawValue.length > 0) {
+  //   const total = Array.from(rawValue).reduce((sum, value) => sum + value, 0);
+  //   const percentages = Array.from(rawValue).map((value) => (value / total) * 100);
+
+    // log.info("reducer12: New data received", percentages.length);
+
+    // // 色マッピングの準備（白と黒のみ）
+    // const colorStops = percentages.map((percentage, index) => {
+    //   let color: string;
+
+    //   // 配列サイズが1の場合は、単一の色（例えば白）を使用
+    //   if (percentages.length === 1) {
+    //     color = "rgb(255, 255, 255)"; // 白
+    //   } else {
+    //     // インデックスに基づいて白から黒へのグラデーションを作成
+    //     color = `rgb(${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255}, ${(index / (percentages.length - 1)) * 255})`;
+    //     // log.info("reducer13: New data received", color);
+    //     // log.info("reducer14: New data received", index);
+    //   }
+    //   log.info("reducer15: color", color);
+    //   log.info("reducer16: percentage", percentage);
+
+    //   return `${color} ${percentage}%`;
+    // });
+
+    // // 円グラフの色付け
+    // const conicGradient = `conic-gradient(${colorStops.join(", ")})`;
+
+    // return (
+    //   <div
+    //     style={{
+    //       display: "flex",
+    //       justifyContent: "center",
+    //       alignItems: "center",
+    //       width: "100%",
+    //       height: "100%",
+    //       position: "relative",
+    //     }}
+    //   >
+    //     <div
+    //       style={{
+    //         width: "200px",
+    //         height: "200px",
+    //         borderRadius: "50%",
+    //         background: conicGradient,
+    //       }}
+    //     />
+    //   </div>
+    // );
+
+//   } else {
+//     // データがない場合のフォールバック
+//     return <div>No data available</div>;
+//   }
+// }
