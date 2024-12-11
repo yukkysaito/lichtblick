@@ -92,6 +92,13 @@ export const getBuiltin: (t: TFunction<"panels">) => PanelInfo[] = (t) => [
     module: async () => await import("./Map"),
   },
   {
+    title: t("pieChart"),
+    type: "PieChart",
+    description: t("pieChartDescription"),
+    thumbnail: pieChartThumbnail,
+    module: async () => await import("./PieChart"),
+  },
+  {
     title: t("parameters"),
     type: "Parameters",
     description: t("parametersDescription"),
