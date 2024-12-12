@@ -10,6 +10,7 @@ import { TFunction } from "i18next";
 import { PanelInfo } from "@lichtblick/suite-base/context/PanelCatalogContext";
 import { TAB_PANEL_TYPE } from "@lichtblick/suite-base/util/globalConstants";
 
+import barChartThumbnail from "./BarChart/thumbnail.png";
 import dataSourceInfoThumbnail from "./DataSourceInfo/thumbnail.png";
 import gaugeThumbnail from "./Gauge/thumbnail.png";
 import imageThumbnail from "./Image/thumbnail.png";
@@ -97,6 +98,13 @@ export const getBuiltin: (t: TFunction<"panels">) => PanelInfo[] = (t) => [
     description: t("pieChartDescription"),
     thumbnail: pieChartThumbnail,
     module: async () => await import("./PieChart"),
+  },
+  {
+    title: t("barChart"),
+    type: "BarChart",
+    description: t("barChartDescription"),
+    thumbnail: barChartThumbnail,
+    module: async () => await import("./BarChart"),
   },
   {
     title: t("parameters"),
