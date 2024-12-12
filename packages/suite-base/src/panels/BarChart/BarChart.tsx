@@ -14,7 +14,7 @@
 
 import * as _ from "lodash-es";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
-import { PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart as RechartsBarChart, Bar, Cell, Tooltip, Legend, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 // import Logger from "@lichtblick/log";
 import { parseMessagePath, MessagePath } from "@lichtblick/message-path";
@@ -32,7 +32,7 @@ type Props = {
 
 const defaultConfig: Config = {
   path: "",
-  title: "Pie Chart",
+  title: "Bar Chart",
   legend1: "Legend 1",
   legend2: "Legend 2",
   legend3: "Legend 3",
@@ -133,7 +133,7 @@ function reducer(state: State, action: Action): State {
 }
 
 
-export function PieChart({ context }: Props): React.JSX.Element {
+export function BarChart({ context }: Props): React.JSX.Element {
   // panel extensions must notify when they've completed rendering
   // onRender will setRenderDone to a done callback which we can invoke after we've rendered
   const [renderDone, setRenderDone] = useState<() => void>(() => () => {});
@@ -235,48 +235,32 @@ export function PieChart({ context }: Props): React.JSX.Element {
         <div>No data available</div>
       ) : (
         <ResponsiveContainer width="100%" height={400}>
-          <RechartsPieChart>
-            <Pie
-              data={data}
+        <RechartsBarChart data={data}>
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Bar
               dataKey="value"
-              nameKey="name"
-              label={({ index }) => {
-                const value = rawValue[index];
-                return value ? value.toFixed(2) : '';
-              }}
-              fill="#8884d8"
-              cx="50%"
-              cy="50%"
-              innerRadius="40%"
-              outerRadius="80%"
               animationBegin={500}
               animationDuration={1500}
               animationEasing="ease-in-out"
             >
               {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.color}
-                />
+                <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
-            </Pie>
+            </Bar>
             <Tooltip
               contentStyle={{
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                borderRadius: '10px',
-                border: 'none',
-                color: '#fff',
-                fontSize: '14px',
-                padding: '10px',
-                boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.3)',
+                backgroundColor: "rgba(255, 255, 255, 0.8)",
+                borderRadius: "10px",
+                color: "#000",
+                fontSize: "14px",
+                boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.3)",
               }}
               formatter={(value, name) => {
                 const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
                 return [`${name}: ${formattedValue}%`];
-              }}
-              />
-            <Legend />
-          </RechartsPieChart>
+              }}            />
+          </RechartsBarChart>
         </ResponsiveContainer>
       )}
     </div>
