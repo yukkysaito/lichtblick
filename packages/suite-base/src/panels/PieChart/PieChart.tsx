@@ -15,6 +15,7 @@ import {
 
 import { parseMessagePath } from "@lichtblick/message-path";
 import { PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
+
 import { simpleGetMessagePathDataItems } from "@lichtblick/suite-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
 import { useLegendCount } from "@lichtblick/suite-base/components/SettingsTreeEditor/useLegendCount";
 
