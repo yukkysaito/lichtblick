@@ -417,23 +417,27 @@ function NodeEditorComponent(props: NodeEditorProps): React.JSX.Element {
       </div>
       {state.open && fieldEditors.length > 0 && (
         <>
+          {(props.panelTitle === "Pie Chart" || props.panelTitle === "Bar Chart") && (
+            <div
+              style={{
+                justifyContent: "flex-end",
+                alignItems: "center",
+                display: "flex",
+                gridColumn: "span 2",
+                marginRight: theme.spacing(1),
+                marginTop: theme.spacing(1),
+              }}
+            >
+              <Typography variant="subtitle2" style={{ marginRight: theme.spacing(1) }}>
+                {t("legendItems")}
+              </Typography>
+              <LegendControls chartType={props.panelTitle} />
+            </div>
+          )}
           <div className={classes.fieldPadding} />
           {fieldEditors}
           <div className={classes.fieldPadding} />
         </>
-      )}
-      {props.panelTitle === "Pie Chart" && (
-        <div
-          style={{
-            justifyContent: "center",
-            display: "flex",
-            gridColumn: "span 2",
-            marginTop: 3,
-            marginBottom: 8,
-          }}
-        >
-          <LegendControls />
-        </div>
       )}
       {state.open && selectVisibilityFilterEnabled && hasChildren && (
         <>
