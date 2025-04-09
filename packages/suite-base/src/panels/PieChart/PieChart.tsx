@@ -55,8 +55,10 @@ function handleFrame(state: State, action: Extract<Action, { type: "frame" }>): 
         continue;
       }
       const data = (message.message as { data: Float32Array }).data;
-      latestMatchingQueriedData = data;
-      latestMessage = message;
+      if (data != undefined) {
+        latestMatchingQueriedData = data;
+        latestMessage = message;
+      }
     }
   }
   return { ...state, latestMessage, latestMatchingQueriedData, error: undefined };
@@ -124,7 +126,7 @@ export function PieChart({ context }: Props): React.JSX.Element {
   // panel extensions must notify when they've completed rendering
   // onRender will setRenderDone to a done callback which we can invoke after we've rendered
   const [renderDone, setRenderDone] = useState<() => void>(() => () => {});
-  const { legendCount } = useLegendCount();
+  const { legendCount } = useLegendCount('Pie Chart');
 
   const [config, setConfig] = useState(() => ({
     ...defaultConfig,
@@ -248,9 +250,6 @@ export function PieChart({ context }: Props): React.JSX.Element {
               cy="50%"
               innerRadius="40%"
               outerRadius="80%"
-              animationBegin={500}
-              animationDuration={1500}
-              animationEasing="ease-in-out"
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />

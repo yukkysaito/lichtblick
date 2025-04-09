@@ -1,30 +1,20 @@
-// SPDX-FileCopyrightText: Copyright (C) 2023-2024 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)<lichtblick@bmwgroup.com>
+// SPDX-FileCopyrightText: Copyright (C) 2024-2025 Yukihiro Saito <yukky.saito@gmail.com>
+// SPDX-FileCopyrightText: Copyright (C) 2025 Takayuki Honda <takayuki.honda@tier4.jp>
 // SPDX-License-Identifier: MPL-2.0
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/
-
-// SPDX-FileCopyrightText: Copyright (C) 2024 Yukihiro Saito <yukky.saito@gmail.com>
-// SPDX-License-Identifier: Apache-2.0
-
-// Portions of this file were modified in 2024 by Yukihiro Saito
-// These modifications are licensed under the Apache License, Version 2.0.
-// You may obtain a copy of the Apache License at http://www.apache.org/licenses/LICENSE-2.0
-
 import * as _ from "lodash-es";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from "react";
-import { BarChart as RechartsBarChart, Bar, Cell, Tooltip, Legend, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useState, useMemo } from "react";
+import { BarChart as RechartsBarChart, Bar, Cell, Tooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
-// import Logger from "@lichtblick/log";
-import { parseMessagePath, MessagePath } from "@lichtblick/message-path";
-import { MessageEvent, PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
+import { parseMessagePath } from "@lichtblick/message-path";
+import { PanelExtensionContext, SettingsTreeAction } from "@lichtblick/suite";
 import { simpleGetMessagePathDataItems } from "@lichtblick/suite-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
+import { useLegendCount } from "@lichtblick/suite-base/components/SettingsTreeEditor/useLegendCount";
 
 import { settingsActionReducer, useSettingsTree } from "./settings";
-import type { Config } from "./types";
+import type { Config, State, Action } from "./types";
+import { useChartData } from "../PieChart/useChartData";
 
-// const log = Logger.getLogger(__filename);
 
 type Props = {
   context: PanelExtensionContext;
@@ -45,90 +35,83 @@ const defaultConfig: Config = {
   legend10: "Legend 10",
 };
 
-type State = {
-  path: string;
-  parsedPath: MessagePath | undefined;
-  latestMessage: MessageEvent | undefined;
-  latestMatchingQueriedData: unknown;
-  error: Error | undefined;
-  pathParseError: string | undefined;
-};
-
-type Action =
-  | { type: "frame"; messages: readonly MessageEvent[] }
-  | { type: "path"; path: string }
-  | { type: "seek" };
-
-function reducer(state: State, action: Action): State {
-  // log.info("New data received: state", state);
-  // log.info("New data received: action", action);
-  try {
-    switch (action.type) {
-      case "frame": {
-        if (state.pathParseError != undefined) {
-          return { ...state, latestMessage: _.last(action.messages), error: undefined };
-        }
-        let latestMatchingQueriedData = state.latestMatchingQueriedData;
-        let latestMessage = state.latestMessage;
-        if (state.parsedPath) {
-
-          for (const message of action.messages) {
-            if (message.topic !== state.parsedPath.topicName) {
-              continue;
-            }
-
-            const data = (message.message as { data: Float32Array }).data;
-
-            if (data != undefined) {
-              latestMatchingQueriedData = data;
-              latestMessage = message;
-            }
-          }
-        }
-        return { ...state, latestMessage, latestMatchingQueriedData, error: undefined };
+// Reducer case: handle new frame messages
+function handleFrame(state: State, action: Extract<Action, { type: "frame" }>): State {
+  if (state.pathParseError != undefined) {
+    return { ...state, latestMessage: _.last(action.messages), error: undefined };
+  }
+  let latestMatchingQueriedData = state.latestMatchingQueriedData;
+  let latestMessage = state.latestMessage;
+  if (state.parsedPath) {
+    for (const message of action.messages) {
+      if (message.topic !== state.parsedPath.topicName) {
+        continue;
       }
-      case "path": {
-        const newPath = parseMessagePath(action.path);
-        let pathParseError: string | undefined;
-        if (
-          newPath?.messagePath.some(
-            (part) =>
-              (part.type === "filter" && typeof part.value === "object") ||
-              (part.type === "slice" &&
-                (typeof part.start === "object" || typeof part.end === "object")),
-          ) === true
-        ) {
-          pathParseError = "Message paths using variables are not currently supported";
-        }
-        let latestMatchingQueriedData: unknown;
-        let error: Error | undefined;
-        try {
-            latestMatchingQueriedData =
-              newPath && pathParseError == undefined && state.latestMessage
-                ? simpleGetMessagePathDataItems(state.latestMessage, newPath)
-                : undefined;
-          } catch (err: unknown) {
-          error = err as Error;
-        }
-        return {
-          ...state,
-          path: action.path,
-          parsedPath: newPath,
-          latestMatchingQueriedData,
-          error,
-          pathParseError,
-        };
+      const data = (message.message as { data: Float32Array }).data;
+      if (data != undefined) {
+        latestMatchingQueriedData = data;
+        latestMessage = message;
       }
-      case "seek":
-        return {
-          ...state,
-          latestMessage: undefined,
-          latestMatchingQueriedData: undefined,
-          error: undefined,
-        };
     }
-  } catch (error) {
-    return { ...state, latestMatchingQueriedData: undefined, error };
+  }
+  return { ...state, latestMessage, latestMatchingQueriedData, error: undefined };
+}
+
+// Reducer case: handle path change
+function handlePath(state: State, action: Extract<Action, { type: "path" }>): State {
+  const newPath = parseMessagePath(action.path);
+  let pathParseError: string | undefined;
+  if (
+    newPath?.messagePath.some(
+      (part) =>
+        (part.type === "filter" && typeof part.value === "object") ||
+        (part.type === "slice" &&
+          (typeof part.start === "object" || typeof part.end === "object")),
+    ) === true
+  ) {
+    pathParseError = "Message paths using variables are not currently supported";
+  }
+  let latestMatchingQueriedData: unknown;
+  let error: Error | undefined;
+  try {
+    latestMatchingQueriedData =
+      newPath && pathParseError == undefined && state.latestMessage
+        ? simpleGetMessagePathDataItems(state.latestMessage, newPath)
+        : undefined;
+  } catch (err: unknown) {
+    error = err as Error;
+  }
+  return {
+    ...state,
+    path: action.path,
+    parsedPath: newPath,
+    latestMatchingQueriedData,
+    error,
+    pathParseError,
+  };
+}
+
+// Reducer case: handle seek (reset state)
+function handleSeek(state: State): State {
+  return {
+    ...state,
+    latestMessage: undefined,
+    latestMatchingQueriedData: undefined,
+    error: undefined,
+  };
+}
+
+// Reducer function combining all cases
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "frame":
+      return handleFrame(state, action);
+    case "path":
+      return handlePath(state, action);
+    case "seek":
+      return handleSeek(state);
+    default:
+      return state;
   }
 }
 
@@ -137,6 +120,7 @@ export function BarChart({ context }: Props): React.JSX.Element {
   // panel extensions must notify when they've completed rendering
   // onRender will setRenderDone to a done callback which we can invoke after we've rendered
   const [renderDone, setRenderDone] = useState<() => void>(() => () => {});
+  const { legendCount } = useLegendCount('Bar Chart');
 
   const [config, setConfig] = useState(() => ({
     ...defaultConfig,
@@ -156,15 +140,44 @@ export function BarChart({ context }: Props): React.JSX.Element {
     }),
   );
 
+  const settingsActionHandler = useCallback(
+    (action: SettingsTreeAction) => {
+      setConfig((prevConfig) => settingsActionReducer(prevConfig, action));
+    },
+    [],
+  );
+
+  const settingsTree = useSettingsTree(
+    config,
+    state.pathParseError,
+    state.error?.message,
+    legendCount,
+  );
+
+  // Extract raw values from queried message data
+  const rawValue = useMemo(
+    () =>
+      state.latestMatchingQueriedData instanceof Float32Array
+        ? state.latestMatchingQueriedData
+        : new Float32Array(),
+    [state.latestMatchingQueriedData],
+  );
+
+  // Normalize values into percentage format from useChartData
+  const data = useChartData(rawValue, config);
+
+  // Dispatch path change on config.path update
   useLayoutEffect(() => {
     dispatch({ type: "path", path: config.path });
   }, [config.path]);
 
+  // Save panel state and title on config update
   useEffect(() => {
     context.saveState(config);
     context.setDefaultPanelTitle(config.path === "" ? undefined : config.path);
   }, [config, context]);
 
+  // Register frame/seek render handler
   useEffect(() => {
     context.onRender = (renderState, done) => {
       setRenderDone(() => done);
@@ -185,14 +198,7 @@ export function BarChart({ context }: Props): React.JSX.Element {
     };
   }, [context]);
 
-  const settingsActionHandler = useCallback(
-    (action: SettingsTreeAction) => {
-      setConfig((prevConfig) => settingsActionReducer(prevConfig, action));
-    },
-    [setConfig],
-  );
-
-  const settingsTree = useSettingsTree(config, state.pathParseError, state.error?.message);
+  // Update panel settings editor with latest tree and handler
   useEffect(() => {
     context.updatePanelSettingsEditor({
       actionHandler: settingsActionHandler,
@@ -200,6 +206,7 @@ export function BarChart({ context }: Props): React.JSX.Element {
     });
   }, [context, settingsActionHandler, settingsTree]);
 
+  // Subscribe/unsubscribe to topic from parsed path
   useEffect(() => {
     if (state.parsedPath?.topicName != undefined) {
       context.subscribe([{ topic: state.parsedPath.topicName, preload: false }]);
@@ -214,20 +221,6 @@ export function BarChart({ context }: Props): React.JSX.Element {
     renderDone();
   }, [renderDone]);
 
-  const rawValue =
-    state.latestMatchingQueriedData instanceof Float32Array
-      ? state.latestMatchingQueriedData
-      : new Float32Array();
-
-  const chartData = rawValue.length > 0 ? Array.from(rawValue).map((value) => (value / Array.from(rawValue).reduce((sum, val) => sum + val, 0)) * 100) : [];
-
-  const data = chartData.map((value, index) => ({
-    name: (config as any)[`legend${index + 1}`] || `Data ${index + 1}`,
-    value,
-    // color: `hsl(${(index / chartData.length) * 40 + 200}, 20%, ${85 - index * 5}%)`, // white based color
-    color: `hsl(${(index / chartData.length) * 40 + 200}, 20%, ${50 - index * 5}%)`, // dark based color
-  }));
-
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', color: '#333' }}>
       <h1 style={{ textAlign: 'center', fontSize: '24px', marginBottom: '20px' }}>{(config as any)[`title`]} </h1>
@@ -240,9 +233,6 @@ export function BarChart({ context }: Props): React.JSX.Element {
             <YAxis />
             <Bar
               dataKey="value"
-              animationBegin={500}
-              animationDuration={1500}
-              animationEasing="ease-in-out"
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -259,7 +249,8 @@ export function BarChart({ context }: Props): React.JSX.Element {
               formatter={(value, name) => {
                 const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
                 return [`${name}: ${formattedValue}%`];
-              }}            />
+              }}
+              />
           </RechartsBarChart>
         </ResponsiveContainer>
       )}
