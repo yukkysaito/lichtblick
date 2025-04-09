@@ -2,30 +2,20 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { useEffect, useState } from "react";
-
 import { getLegendCount, setLegendCount, subscribeLegendCount } from "./legendCountStore";
 
-export function useLegendCount(): {
-  legendCount: number;
-  setLegendCount: (newCount: number) => void;
-  increment: () => void;
-  decrement: () => void;
-} {
-  const [count, setCount] = useState(getLegendCount());
+export function useLegendCount(chartType: string) {
+  const [count, setCount] = useState(getLegendCount(chartType));
 
   useEffect(() => {
-    const unsubscribe = subscribeLegendCount(setCount);
+    const unsubscribe = subscribeLegendCount(chartType, setCount);
     return unsubscribe;
-  }, []);
+  }, [chartType]);
 
   return {
     legendCount: count,
-    setLegendCount,
-    increment: () => {
-      setLegendCount(getLegendCount() + 1);
-    },
-    decrement: () => {
-      setLegendCount(Math.max(1, getLegendCount() - 1));
-    },
+    setLegendCount: (newCount: number) => setLegendCount(chartType, newCount),
+    increment: () => setLegendCount(chartType, getLegendCount(chartType) + 1),
+    decrement: () => setLegendCount(chartType, Math.max(1, getLegendCount(chartType) - 1)),
   };
 }

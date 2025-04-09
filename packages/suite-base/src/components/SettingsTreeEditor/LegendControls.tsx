@@ -7,17 +7,35 @@ import { IconButton } from "@mui/material";
 
 import { useLegendCount } from "./useLegendCount";
 
-export const LegendControls = (): React.JSX.Element => {
-  const { increment, decrement } = useLegendCount();
+export const LegendControls = ({ chartType }: { chartType: string }): React.JSX.Element => {
+  const { increment, decrement } = useLegendCount(chartType);
 
   return (
-    <>
-      <IconButton onClick={increment}>
+    <div style={{ display: "flex", gap: 5 }}>
+      <IconButton
+        onClick={increment}
+        color="primary"
+        sx={{
+          border: "1px solid",
+          borderColor: "primary.main",
+          width: 25,
+          height: 25,
+        }}
+      >
         <AddIcon />
       </IconButton>
-      <IconButton onClick={decrement}>
+      <IconButton
+        onClick={decrement}
+        color="primary"
+        sx={{
+          border: "1px solid",
+          borderColor: "primary.main",
+          width: 25,
+          height: 25,
+        }}
+      >
         <RemoveIcon />
       </IconButton>
-    </>
+    </div>
   );
 };

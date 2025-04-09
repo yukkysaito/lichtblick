@@ -2,23 +2,33 @@
 
 // SPDX-License-Identifier: MPL-2.0
 
-let legendCount = 10;
-let listeners: ((count: number) => void)[] = [];
+type LegendCountMap = {
+  [chartType: string]: number;
+};
 
-export function getLegendCount(): number {
-  return legendCount;
+let legendCounts: LegendCountMap = {
+  pie: 10,
+  bar: 10,
+};
+
+const listeners: ((chartType: string, count: number) => void)[] = [];
+
+export function getLegendCount(chartType: string): number {
+  return legendCounts[chartType] ?? 10;
 }
 
-export function setLegendCount(newCount: number): void {
-  legendCount = newCount;
-  listeners.forEach((cb) => {
-    cb(legendCount);
-  });
+export function setLegendCount(chartType: string, count: number): void {
+  legendCounts[chartType] = count;
+  listeners.forEach((listener) => listener(chartType, count));
 }
 
-export function subscribeLegendCount(cb: (count: number) => void): () => void {
-  listeners.push(cb);
+export function subscribeLegendCount(chartType: string, cb: (count: number) => void): () => void {
+  const listener = (type: string, count: number) => {
+    if (type === chartType) cb(count);
+  };
+  listeners.push(listener);
   return () => {
-    listeners = listeners.filter((l) => l !== cb);
+    const index = listeners.indexOf(listener);
+    if (index >= 0) listeners.splice(index, 1);
   };
 }
